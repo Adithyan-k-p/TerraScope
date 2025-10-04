@@ -3,7 +3,6 @@ from fastapi import FastAPI
 from ingest.rainfall import store_rainfall, fetch_rainfall
 from ingest.temperature import store_temperature, fetch_temperature
 from ingest.humidity import store_humidity, fetch_humidity
-from detect.anomaly import detect_rainfall_anomaly, detect_temperature_anomaly,detect_humidity_anomaly
 from utils.nasa_api import fetch_nasa_data
 from datetime import datetime, UTC
 
@@ -57,21 +56,4 @@ def get_temperature():
 def get_humidity():
     return fetch_humidity()
 
-# ⚠️ Detect Anomalies
-
-@app.get("/detect-rainfall-anomaly")
-def detect_rainfall():
-    return {"anomalies": detect_rainfall_anomaly()}
-
-@app.get("/detect-temperature-anomaly")
-def detect_temperature():
-    return {"anomalies": detect_temperature_anomaly()}
-
-@app.get("/detect-humidity-anomaly")
-def detect_humidity():
-    return {"anomalies": detect_humidity_anomaly()}
-
-if __name__ == '__main__':
-    print(detect_rainfall())
-    print(detect_humidity())
 
