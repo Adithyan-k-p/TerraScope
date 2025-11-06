@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TerraScope - Sign Up</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #74ebd5, #ACB6E5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .signup-box {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+      text-align: center;
+      width: 100%;
+      max-width: 400px;
+    }
+    h2 {
+      margin-bottom: 20px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .result {
+      margin-top: 20px;
+      font-size: 1em;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="signup-box">
+    <h2>Create Your TerraScope Account</h2>
+    <input type="text" id="name" placeholder="Full Name" required />
+    <input type="text" id="location" placeholder="District, Panchayath" required />
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Password (min 8 chars)" required />
+    <button onclick="signup()">Sign Up</button>
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    const baseUrl = "http://localhost:5000"; // Replace with your IP if needed
+
+    function signup() {
+      const name = document.getElementById("name").value.trim();
+      const location = document.getElementById("location").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!name || !location || !email || password.length < 8) {
+        document.getElementById("result").innerText = "Please fill all fields correctly.";
+        return;
+      }
+
+      fetch(`${baseUrl}/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, location, email, password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const result = document.getElementById("result");
+        if (data.status === "success") {
+          result.innerHTML = `✅ Signup successful! Your user ID is <strong>${data.user_id}</strong>`;
+          document.getElementById("name").value = "";
+          document.getElementById("location").value = "";
+          document.getElementById("email").value = "";
+          document.getElementById("password").value = "";
+          window.location.href = "/dashboard";
+        } else {
+          result.innerHTML = `❌ Signup failed: ${data.message}`;
+        }
+      })
+      .catch(() => {
+        document.getElementById("result").innerText = "Server error. Please try again.";
+      });
+    }
+  </script>
+</body>
+</html>

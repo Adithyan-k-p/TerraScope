@@ -1,15 +1,19 @@
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
+# from datetime import datetime
 from db import get_db_connection
-from flask import Flask, render_template, request, jsonify
-import requests
-from datetime import datetime, timedelta
+from ingest.rainfall import fetch_rainfall
+from ingest.temperature import fetch_temperature
+from ingest.humidity import fetch_humidity
+from utils.nasa_api import fetch_nasa_data
+from detect.pipeline import run_climate_anomaly_detection
 
 app = Flask(__name__, template_folder="template")
 CORS(app)
 
-# Serve HTML pages
+# ✅ Home
+
 @app.route("/", methods=["GET"])
 def home():
     return render_template("index.html")
@@ -26,15 +30,16 @@ def signup_page():
 def dashboard_page():
     return render_template("dashboard.html")
 
-# Signup API
+# ✅ User Signup
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.json
     name = data.get("name")
     email = data.get("email")
     password = data.get("password")
-    location = data.get("location")
+    location = data.get("location")  # From HTML form
 
+    # Split location into district and panchayath (basic fallback)
     if location and "," in location:
         district, panchayath = [x.strip() for x in location.split(",", 1)]
     else:
@@ -60,7 +65,9 @@ def signup():
         cur.close()
         conn.close()
 
-# Login API
+
+# ✅ User Login
+
 @app.route("/login", methods=["POST"])
 def login():
     data = request.json
@@ -82,77 +89,72 @@ def login():
             "panchayath": user[3]
         }), 200
     else:
-        return jsonify({"status": "error", "message": "Invalid credentials"}), 401
+        return jsonify({
+            "status": "error",
+            "message": "Invalid credentials"
+        }), 401
 
-# Anomaly API
-@app.route("/api/anomalies", methods=["GET"])
-def get_anomalies():
+# 🚀 Ingest NASA Climate Data
+@app.route("/ingest-nasa", methods=["GET"])
+def ingest_nasa():
+    try:
+        inserted = fetch_nasa_data()
+        return jsonify({
+            "message": "NASA data ingested successfully",
+            "records_inserted": inserted
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# 🧠 Run Anomaly Detection
+@app.route("/run-anomaly-detection", methods=["GET"])
+def run_anomaly():
+    run_climate_anomaly_detection()
+    return jsonify({"message": "Anomaly detection completed and stored"})
+
+# 📊 Fetch Rainfall Records
+@app.route("/rainfall", methods=["GET"])
+def get_rainfall():
+    return jsonify(fetch_rainfall())
+
+# 📊 Fetch Temperature Records
+@app.route("/temperature", methods=["GET"])
+def get_temperature():
+    return jsonify(fetch_temperature())
+
+# 📊 Fetch Humidity Records
+@app.route("/humidity", methods=["GET"])
+def get_humidity():
+    return jsonify(fetch_humidity())
+
+# 📍 Fetch Anomalies by District & Panchayath
+@app.route("/anomalies", methods=["GET"])
+def anomalies():
+    district = request.args.get("district")
+    panchayath = request.args.get("panchayath")
+
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT district, panchayath, parameter, severity, timestamp
+        SELECT parameter, value, deviation, severity, timestamp
         FROM climate_anomalies
+        WHERE district=%s AND panchayath=%s
         ORDER BY timestamp DESC
         LIMIT 10
-    """)
+    """, (district, panchayath))
     rows = cur.fetchall()
     cur.close()
     conn.close()
 
     return jsonify([
         {
-            "region": f"{r[0]}, {r[1]}",
-            "parameter": r[2],
-            "severity": float(r[3]),
-            "timestamp": r[4].strftime("%Y-%m-%d %H:%M")
+            "parameter": r[0],
+            "value": r[1],
+            "deviation": r[2],
+            "severity": r[3],
+            "timestamp": r[4]
         } for r in rows
     ])
-
-@app.route("/api/anomalies", methods=["GET"])
-def fetch_anomalies():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT district, panchayath, parameter, severity, timestamp
-        FROM climate_anomalies
-        ORDER BY timestamp DESC
-        LIMIT 10
-    """)
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    return jsonify([
-        {
-            "region": f"{r[0]}, {r[1]}",
-            "parameter": r[2],
-            "severity": float(r[3]),
-            "timestamp": r[4].strftime("%Y-%m-%d %H:%M")
-        } for r in rows
-    ])
-
-
-@app.route("/api/nasa")
-def nasa_data():
-    lat = request.args.get("lat")
-    lon = request.args.get("lon")
-    end = datetime.utcnow().date()
-    start = end - timedelta(days=7)
-
-    url = f"https://power.larc.nasa.gov/api/temporal/daily/point"
-    params = {
-        "parameters": "T2M,RH2M,PRECTOT",
-        "start": start.strftime("%Y%m%d"),
-        "end": end.strftime("%Y%m%d"),
-        "latitude": lat,
-        "longitude": lon,
-        "format": "JSON",
-        "community": "AG"
-    }
-
-    res = requests.get(url, params=params).json()
-    data = res["properties"]["parameter"]
-    return jsonify(data)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

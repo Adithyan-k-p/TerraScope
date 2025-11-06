@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TerraScope Climate Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+  <!-- Header -->
+  <header class="bg-white shadow p-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold text-teal-700">TerraScope Climate Dashboard</h1>
+    <span class="text-sm text-gray-500">Updated: Oct 5, 2025</span>
+  </header>
+
+  <!-- Graphs Row -->
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+    <div class="bg-white p-4 rounded shadow">
+      <h2 class="text-lg font-semibold mb-2">Temperature (°C)</h2>
+      <canvas id="tempChart"></canvas>
+    </div>
+    <div class="bg-white p-4 rounded shadow">
+      <h2 class="text-lg font-semibold mb-2">Humidity (%)</h2>
+      <canvas id="humidityChart"></canvas>
+    </div>
+    <div class="bg-white p-4 rounded shadow">
+      <h2 class="text-lg font-semibold mb-2">Rainfall (mm)</h2>
+      <canvas id="rainChart"></canvas>
+    </div>
+  </section>
+
+  <!-- Anomaly Summary Table -->
+  <section class="p-6">
+    <h2 class="text-lg font-semibold mb-4">Anomaly Summary</h2>
+    <div class="overflow-x-auto">
+      <table class="min-w-full bg-white rounded shadow text-sm">
+        <thead class="bg-teal-600 text-white">
+          <tr>
+            <th class="px-4 py-2 text-left">Date</th>
+            <th class="px-4 py-2 text-left">Parameter</th>
+            <th class="px-4 py-2 text-left">Value</th>
+            <th class="px-4 py-2 text-left">Deviation</th>
+            <th class="px-4 py-2 text-left">Severity</th>
+          </tr>
+        </thead>
+        <tbody id="anomalyTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <script>
+    const labels = ["Oct 1", "Oct 2", "Oct 3", "Oct 4", "Oct 5", "Oct 6", "Oct 7"];
+    const temperature = [28, 29, 27, 35, 30, 28, 27];
+    const humidity = [70, 72, 68, 85, 71, 69, 68];
+    const rainfall = [5, 6, 4, 20, 5, 6, 4];
+
+    function detectAnomalies(data, label, threshold = 1.5) {
+      const mean = data.reduce((a, b) => a + b, 0) / data.length;
+      return data.map((val, i) => {
+        const diff = Math.abs(val - mean);
+        const severity = (diff / mean).toFixed(2);
+        return diff > threshold * mean
+          ? { date: labels[i], parameter: label, value: val, deviation: diff.toFixed(1), severity }
+          : null;
+      }).filter(Boolean);
+    }
+
+    function renderChart(id, label, data, color) {
+      new Chart(document.getElementById(id), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label,
+            data,
+            borderColor: color,
+            backgroundColor: color + "33",
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    function renderTable(anomalies) {
+      const tbody = document.getElementById("anomalyTableBody");
+      anomalies.forEach(a => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td class="px-4 py-2">${a.date}</td>
+          <td class="px-4 py-2">${a.parameter}</td>
+          <td class="px-4 py-2">${a.value}</td>
+          <td class="px-4 py-2">${a.deviation}</td>
+          <td class="px-4 py-2 text-red-600 font-semibold">${a.severity}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Render charts
+    renderChart("tempChart", "Temperature", temperature, "#EF4444");
+    renderChart("humidityChart", "Humidity", humidity, "#3B82F6");
+    renderChart("rainChart", "Rainfall", rainfall, "#10B981");
+
+    // Detect and display anomalies
+    const anomalies = [
+      ...detectAnomalies(temperature, "Temperature"),
+      ...detectAnomalies(humidity, "Humidity"),
+      ...detectAnomalies(rainfall, "Rainfall")
+    ];
+    renderTable(anomalies);
+  </script>
+</body>
+</html>
